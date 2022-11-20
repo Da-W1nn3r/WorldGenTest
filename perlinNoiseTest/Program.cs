@@ -2523,6 +2523,7 @@ namespace perlinNoiseTest
 				bool[,] searchedBuffer = new bool[width, height];
 				int[] water = new int[2];
 				bool connected = false;
+				bool change = true;
 				int[,] distance = new int[width, height];
 				int[,,] origin = new int[width, height, 2];
 				bool[,] impassable = new bool[width, height];
@@ -2530,17 +2531,14 @@ namespace perlinNoiseTest
 				List<Coordinates> waterSources = new List<Coordinates> { };
 				int checkX = -1;
 				int checkY = -1;
+				Coordinates item = new Coordinates { };
 				Random random = new Random(seed);
-				for (int i = 0; i < (Math.Sqrt(width * height)/5) + 2; i++)
+                for (int i = 0; i < (Math.Sqrt(width * height) / 10) + 2; i++)
 				{
 					checkX = random.Next(0, width);
 					checkY = random.Next(0, height);
 					waterSources.Add(new Coordinates { xCoord = checkX, yCoord = checkY });
-					Console.WriteLine(checkX + "," + checkY);
-				}
-				Console.ReadLine();
-				foreach (var item in waterSources)
-				{
+					item = waterSources[i];
 					temp[0] = item.xCoord;
 					temp[1] = item.yCoord;
                     //Resets pathfinding values
@@ -2562,9 +2560,10 @@ namespace perlinNoiseTest
 					water[0] = -1;
 					water[1] = -1;
 					searched[temp[0], temp[1]] = true;
-                    while (!connected && searched != searchedBuffer)
+					distance[temp[0], temp[1]] = 0;
+					while (!connected && change)
                     {
-                        searchedBuffer = searched;
+						change = false;
                         //Finding nearest water
                         for (int x = width - 1; x >= 0; x--)
                         {
@@ -2588,16 +2587,25 @@ namespace perlinNoiseTest
                                                     distance[x + a, y + b] = distance[x, y] + 14;
 													origin[x + a, y + b, 0] = x;
 													origin[x + a, y + b, 1] = y;
-													searched[x + a, y + b] = true;
-                                                }
+													if (!searched[x + a, y + b])
+													{
+														searched[x + a, y + b] = true;
+														change = true;
+													}
+												}
                                                 else if (distance[x + a, y + b] > distance[x, y] + 10)
                                                 {
                                                     distance[x + a, y + b] = distance[x, y] + 10;
 													origin[x + a, y + b, 0] = x;
 													origin[x + a, y + b, 1] = y;
-													searched[x + a, y + b] = true;
+                                                    if (!searched[x + a, y + b])
+                                                    {
+                                                        searched[x + a, y + b] = true;
+														change = true;
+                                                    }
+													
                                                 }
-                                                if (heightMap[x + a, y + b] < 3 || river[x + a, y + b] && (water[0] == -1 && water[1] == -1))
+                                                if ((heightMap[x + a, y + b] < 2.9 || river[x + a, y + b]) && (water[0] == -1 && water[1] == -1))
                                                 {
                                                     water[0] = x;
                                                     water[1] = y;
@@ -2631,20 +2639,28 @@ namespace perlinNoiseTest
                                                     distance[x + a, y + b] = distance[x, y] + 14;
 													origin[x + a, y + b, 0] = x;
 													origin[x + a, y + b, 1] = y;
-													searched[x + a, y + b] = true;
-                                                }
+													if (!searched[x + a, y + b])
+													{
+														searched[x + a, y + b] = true;
+														change = true;
+													}
+												}
                                                 else if (distance[x + a, y + b] > distance[x, y] + 10)
                                                 {
                                                     distance[x + a, y + b] = distance[x, y] + 10;
 													origin[x + a, y + b, 0] = x;
 													origin[x + a, y + b, 1] = y;
-													searched[x + a, y + b] = true;
-                                                }
+													if (!searched[x + a, y + b])
+													{
+														searched[x + a, y + b] = true;
+														change = true;
+													}
+												}
                                                 
                                             }
                                         }
                                     }
-                                    if ((heightMap[x, y] < 3 || river[x, y] == true) && (water[0] == -1 && water[1] == -1))
+                                    if ((heightMap[x, y] < 2.9 || river[x, y] == true) && (water[0] == -1 && water[1] == -1))
                                     {
                                         water[0] = x;
                                         water[1] = y;
@@ -2655,23 +2671,28 @@ namespace perlinNoiseTest
 
                                 }
                         }
-						Draw.DEBUG_PATHFINDING(heightMap, impassable, searched, searchedBuffer, item);
                     }
+					while (water[0] != item.xCoord && water[1] != item.yCoord && connected)
+					{
+						temp[0] = origin[water[0], water[1], 0];
+						temp[1] = origin[water[0], water[1], 1];
+						water[0] = temp[0];
+						water[1] = temp[1];
+						river[water[0], water[1]] = true;
+					}
                     if (connected)
                     {
-                        while (origin[water[0], water[1], 0] != water[0] && origin[water[0], water[1], 1] != water[1])
-                        {
-                            river[water[0], water[1]] = true;
-							water[0] = origin[water[0], water[1], 0];
-							water[1] = origin[water[0], water[1], 1];
-						}
+						count++;
                     }
-                    
+                    else
+                    {
+						i--;
+                    }
 					connected = false;
-                    count++;
 					Console.ForegroundColor = ConsoleColor.White;
 					Console.WriteLine("Rivers Drawn: " + count);
 				}
+				Draw.Rivers(heightMap, river, waterSources);
 				return river;
 			}
 		}
@@ -2870,7 +2891,7 @@ namespace perlinNoiseTest
 					Console.WriteLine();
 				}
 			}
-			public static void DEBUG_PATHFINDING(double[,] heightMap, bool[,] impassable, bool[,] searched, bool[,] searchedBuffer, Coordinates source)
+			public static void DEBUG_PATHFINDING(double[,] heightMap, bool[,] impassable, bool[,] searched, Coordinates source)
 			{
 				for (int x = 0; x < heightMap.GetLength(0); x++)
 				{
@@ -2917,13 +2938,9 @@ namespace perlinNoiseTest
 							}
 						}
 						Console.ForegroundColor = ConsoleColor.Black;
-						if (searchedBuffer[x, y])
+						if (searched[x, y])
 						{
 							Console.Write("X");
-						}
-						else if (searchedBuffer[x, y])
-						{
-							Console.Write("+");
 						}
 						else
 						{
